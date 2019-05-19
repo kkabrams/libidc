@@ -4,7 +4,7 @@ PREFIX:=/usr/local
 
 all: libidc.so ircify
 
-ircify: LDLIBS=-lidc
+ircify: LDLIBS=-lidc -L.
 ircify: CFLAGS=-g3 -Wall -pedantic
 ircify: ircify.c
 
