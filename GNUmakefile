@@ -1,14 +1,15 @@
 CFLAGS=-fpic -shared -pedantic -Wall -g3
-TARGET=libline.so
+TARGET=libidc.so
 PREFIX:=/usr/local
 
-all: libline.so ircify
+all: libidc.so ircify
 
-ircify: LDLIBS=-Lline
+ircify: LDLIBS=-lidc
+ircify: CFLAGS=-g3 -Wall -pedantic
 ircify: ircify.c
 
-$(TARGET): libline.o
-	ld -shared -o $(TARGET) libline.o
+$(TARGET): libidc.o
+	ld -shared -o $(TARGET) libidc.o
 
 clean:
 	rm -f $(TARGET) ircify
@@ -18,4 +19,4 @@ install: all
 	mkdir -p $(PREFIX)/lib
 	mkdir -p $(PREFIX)/include
 	install $(TARGET) $(PREFIX)/lib/$(TARGET)
-	install line.h $(PREFIX)/include/line.h
+	install idc.h $(PREFIX)/include/idc.h

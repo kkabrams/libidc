@@ -11,7 +11,7 @@
 #include <errno.h>
 
 //#define CHUNK 4096
-#include "line.h"
+#include "idc.h"
 
 #define TSIZE 65536
 
@@ -128,11 +128,11 @@ int select_on_everything() {
 //  if((j=select(fdmax+1,&readfs,0,0,&timeout)) == -1 ) {
     if((j=select(libline.fdmax+1,&readfs,0,0,NULL)) == -1 ) {//we want to select-sleep as long as possible.
       //any reason to wake up should be a file descriptor in the list. (works for X11 events, dunno about others)
-
       //on error filedescriptors aren't changed
       //the value of timeout is undefined
       //so says the linux man page for select.
-      return perror("select"),1;
+      if(errno != 0) return perror("select"),1;
+      else perror("wtf? select");
       //continue;
     }
 
@@ -141,10 +141,14 @@ int select_on_everything() {
     for(i=0;libline.fds[i].fd != -1 && j>0;i++) {
       if(!FD_ISSET(libline.fds[i].fd,&readfs)) continue;//did not find one. hurry back to the for loop
       j--;//we found one. trying to get j==0 so we can get out of here early.
-      if((n=read(libline.fds[i].fd,libline.fds[i].buffer,CHUNK)) <= 0) {
-        snprintf(tmp,sizeof(tmp)-1,"fd %d: read",libline.fds[i].fd);//hopefully this doesn't error and throw off error messages.
+      if((n=read(libline.fds[i].fd,libline.fds[i].buffer,CHUNK)) < 0) {
+        snprintf(tmp,sizeof(tmp)-1,"fd %d: read perror:",libline.fds[i].fd);//hopefully this doesn't error and throw off error messages.
         perror(tmp);
         return 2;
+      }
+      if(n == 0) {
+        fprintf(stderr,"reached EOF on fd: %d\n",libline.fds[i].fd);
+        return 3;
       }
       if(libline.fds[i].bllen+n > libline.fds[i].blsize) {//this is probably off...
         t=malloc(libline.fds[i].blsize+n);
