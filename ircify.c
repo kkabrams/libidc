@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "line.h"
+#include "idc.h"
 
 extern struct global libline;
 
