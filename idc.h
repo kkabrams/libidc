@@ -15,6 +15,9 @@ struct shit {
   char buffer[CHUNK];//THIS IS *NOT* NULL TERMINATED.
 
   char *delim;
+
+  char read_lines_for_us;
+  char keep_open;
   //other stuffs?
 //  union {
   void (*line_handler)(struct shit *me,char *line);//function pointer to the handler. ???
