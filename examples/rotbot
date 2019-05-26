@@ -1,0 +1,4 @@
+#!/bin/sh
+export LD_LIBRARY_PATH=.
+exec socat ssl:main.lv:6697,verify=0 \
+'exec:ircify rotbot #default '`pwd`'/rot13.sh'
