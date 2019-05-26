@@ -19,4 +19,5 @@ install: all
 	mkdir -p $(PREFIX)/lib
 	mkdir -p $(PREFIX)/include
 	install $(TARGET) $(PREFIX)/lib/$(TARGET)
+	install ircify $(PREFIX)/bin/ircify
 	install idc.h $(PREFIX)/include/idc.h
