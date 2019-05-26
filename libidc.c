@@ -76,17 +76,40 @@ int update_shits() {
 
 int add_fd(int fd,void (*line_handler)(struct shit *,char *)) {
   int i;
-  for(i=0;libline.fds[i].fd != -1;i++);//we're going to use the index of the first -1
+  for(i=0;libline.fds[i].fd != -1 && i <= libline.shitlen;i++);//we're going to use the index of the first -1 or last spot.
+  fprintf(stderr,"adding fd: %d to i: %d\n",fd,i);
+  if(libline.fds[i].fd != -1) {
+    fprintf(stderr,"I fucked up somehow.\n");
+  }
   libline.fds[i].fd=fd;
+  //libline.fds[i+1].fd=-1;//not always true! we could be inserting to spot 0 while spot 1 is still valid.
   libline.fds[i].backlog=malloc(CHUNK);
   memset(libline.fds[i].backlog,0,CHUNK);
   memset(libline.fds[i].buffer,0,CHUNK);
   libline.fds[i].blsize=CHUNK;
   libline.fds[i].bllen=0;//CHUNK;
+  libline.fds[i].read_lines_for_us=1;//default to reading lines for the fd
   libline.fds[i].line_handler=line_handler;
-  libline.shitlen = i >= libline.shitlen ? i+1 : libline.shitlen ;
+  libline.shitlen = i >= libline.shitlen ? i+1 : libline.shitlen+1 ;
+  libline.fds[libline.shitlen].fd=-1;//this should always work to pad the end with a -1 even though the end should stop sooner.
   update_shits();
-  return 0;
+  return i;//return the index we used so we can add more stuff to the struct
+}
+
+int rm_fd(int fd) {
+  int i;
+  for(i=0;libline.fds[i].fd != fd && i <= libline.shitlen;i++);//loop until found or at end
+  if(libline.fds[i].fd != i) return -1;//fd wasn't found
+  libline.fds[i].fd=-1;//good enough probably. maybe free()? probably free()
+  free(libline.fds[i].backlog);
+  libline.fds[i].backlog=0;
+//  free(libline.fds[i].buffer);
+  libline.fds[i].buffer[0]=0;
+  libline.fds[i].blsize=0;
+  libline.fds[i].bllen=0;
+  libline.fds[i].line_handler=0;
+  if(i == libline.shitlen-1) libline.shitlen--;
+  return fd;
 }
 
 //functions to add:
@@ -105,6 +128,7 @@ char *memstr(char *s,char *find,size_t l) {
 
 int select_on_everything() {
   int hack;
+  FILE *tmpfp;
   fd_set master;
   fd_set readfs;
 //  struct timeval timeout;
@@ -115,11 +139,17 @@ int select_on_everything() {
   FD_ZERO(&master);
   FD_ZERO(&readfs);
   for(;;) { //at the start of each loop we'll need to recalculate some stuff if there was a change.
-    //printf("in mainloop\n");
+    fprintf(stderr,"in mainloop\n");
     //if(recalc_shit) { //this is set by anything changing the table of descriptors
-    for(i=0;libline.fds[i].fd != -1;i++) {
-      FD_SET(libline.fds[i].fd,&master);
+    fprintf(stderr,"building master: ");
+    FD_ZERO(&master);
+    for(i=0;i <= libline.shitlen;i++) {
+      if(libline.fds[i].fd != -1) {
+        fprintf(stderr,"fd:%d ",libline.fds[i].fd);
+        FD_SET(libline.fds[i].fd,&master);
+      }
     }
+    fprintf(stderr,"\n");
     //  recalc_shit=0;
     //}
     readfs=master;
@@ -131,16 +161,25 @@ int select_on_everything() {
       //on error filedescriptors aren't changed
       //the value of timeout is undefined
       //so says the linux man page for select.
+      if(errno == EINTR) {
+        perror("asdf");
+        continue;//just try again
+      }
       if(errno != 0) return perror("select"),1;
       else perror("wtf? select");
       //continue;
     }
-
+    fprintf(stderr,"after select(). ret: %d\n",j);
 //  for(i=0;fds[i] != -1;i++) if(extra_handler) extra_handler(fds[i]);
     if(j == 0) continue;//don't bother to loop over them.
-    for(i=0;libline.fds[i].fd != -1 && j>0;i++) {
+    for(i=0;i < libline.shitlen && j>0;i++) {
+      if(libline.fds[i].fd == -1) continue;//skip -1s
       if(!FD_ISSET(libline.fds[i].fd,&readfs)) continue;//did not find one. hurry back to the for loop
       j--;//we found one. trying to get j==0 so we can get out of here early.
+      if(libline.fds[i].read_lines_for_us == 0) {
+        libline.fds[i].line_handler(&libline.fds[i],0);//the line pointer is null.
+        continue;//we don't need to read the line.
+      }
       if((n=read(libline.fds[i].fd,libline.fds[i].buffer,CHUNK)) < 0) {
         snprintf(tmp,sizeof(tmp)-1,"fd %d: read perror:",libline.fds[i].fd);//hopefully this doesn't error and throw off error messages.
         perror(tmp);
@@ -148,7 +187,15 @@ int select_on_everything() {
       }
       if(n == 0) {
         fprintf(stderr,"reached EOF on fd: %d\n",libline.fds[i].fd);
-        return 3;
+        if(libline.fds[i].keep_open) {
+          tmpfp=fdopen(libline.fds[i].fd,"r");
+          clearerr(tmpfp);
+          //fuck if I know...
+        } else {
+         //we need some way to keep it open on EOF.
+          libline.fds[i].fd=-1;//kek
+         //return 3;
+        }
       }
       if(libline.fds[i].bllen+n > libline.fds[i].blsize) {//this is probably off...
         t=malloc(libline.fds[i].blsize+n);
@@ -168,11 +215,18 @@ int select_on_everything() {
         } else {
           hack=1;
         }
-        *t=0;
-        if(libline.fds[i].line_handler) libline.fds[i].line_handler(&libline.fds[i],line);
-        libline.fds[i].bllen-=((t+hack)-libline.fds[i].backlog);
-        if(libline.fds[i].bllen <= 0) libline.fds[i].bllen=0;
-        else memmove(libline.fds[i].backlog,(t+hack),libline.fds[i].bllen);
+        *t=0;//we need a way to undo this if the line wasn't eaten.
+        fprintf(stderr,"libidc: line for %d: %s\n",libline.fds[i].fd,line);
+        if(libline.fds[i].line_handler) {
+          libline.fds[i].line_handler(&libline.fds[i],line);
+          libline.fds[i].bllen-=((t+hack)-libline.fds[i].backlog);
+          if(libline.fds[i].bllen <= 0) libline.fds[i].bllen=0;
+          else memmove(libline.fds[i].backlog,(t+hack),libline.fds[i].bllen);
+          //} else {//if the line handler didn't eat the line we should restore it back to original.
+          // if(hack == 2) {*t='\r'; t++;}
+          // *t='\n';
+          //}
+        }
       }
     }
   }
