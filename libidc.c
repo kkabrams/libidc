@@ -176,23 +176,27 @@ int select_on_everything() {
       if(libline.fds[i].fd == -1) continue;//skip -1s
       if(!FD_ISSET(libline.fds[i].fd,&readfs)) continue;//did not find one. hurry back to the for loop
       j--;//we found one. trying to get j==0 so we can get out of here early.
-      if(libline.fds[i].read_lines_for_us == 0) {
-        libline.fds[i].line_handler(&libline.fds[i],0);//the line pointer is null.
-        continue;//we don't need to read the line.
-      }
+      //if(libline.fds[i].read_lines_for_us == 0) {
+      //  libline.fds[i].line_handler(&libline.fds[i],0);//the line pointer is null.
+      //  continue;//we don't need to read the line.
+      //}
+      fprintf(stderr,"attempting to read from fd: %d\n",libline.fds[i].fd);
       if((n=read(libline.fds[i].fd,libline.fds[i].buffer,CHUNK)) < 0) {
         snprintf(tmp,sizeof(tmp)-1,"fd %d: read perror:",libline.fds[i].fd);//hopefully this doesn't error and throw off error messages.
         perror(tmp);
         return 2;
       }
+      fprintf(stderr,"read %d bytes from fd: %d\n",n,libline.fds[i].fd);
       if(n == 0) {
         fprintf(stderr,"reached EOF on fd: %d\n",libline.fds[i].fd);
         if(libline.fds[i].keep_open) {
-          tmpfp=fdopen(libline.fds[i].fd,"r");
-          clearerr(tmpfp);
+          //tmpfp=fdopen(libline.fds[i].fd,"r");
+          //lseek(libline.fds[i].fd,SEEK_SET,0);
+          //clearerr(tmpfp);
           //fuck if I know...
         } else {
          //we need some way to keep it open on EOF.
+          if(libline.fds[i].line_handler) libline.fds[i].line_handler(&libline.fds[i],0);//dunno
           libline.fds[i].fd=-1;//kek
          //return 3;
         }
