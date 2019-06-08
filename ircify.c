@@ -13,7 +13,7 @@ char channel[256];
 void irc_handler(struct shit *me,char *line) {
   char tmp[1024];
   if(!strncmp(line,"PING ",5)) {
-    printf("PONG :%s\r\n",line+5);
+    printf("PONG %s\r\n",line+5);
     fflush(stdout);
   }
   if(*line == ':') {
