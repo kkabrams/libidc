@@ -128,6 +128,7 @@ char *memstr(char *s,char *find,size_t l) {
 
 int select_on_everything() {
   int hack;
+  int at_least_one;
   FILE *tmpfp;
   fd_set master;
   fd_set readfs;
@@ -143,19 +144,23 @@ int select_on_everything() {
     //if(recalc_shit) { //this is set by anything changing the table of descriptors
     fprintf(stderr,"building master: ");
     FD_ZERO(&master);
+    at_least_one=0;
     for(i=0;i <= libline.shitlen;i++) {
       if(libline.fds[i].fd != -1) {
+        at_least_one++;
         fprintf(stderr,"fd:%d ",libline.fds[i].fd);
         FD_SET(libline.fds[i].fd,&master);
       }
     }
     fprintf(stderr,"\n");
+    if(!at_least_one) return 0;//we have nothing else to possibly do.
     //  recalc_shit=0;
     //}
     readfs=master;
 //  timeout.tv_sec=0; //going to leave these three lines if I change my mind about acting like snow-white
 //  timeout.tv_usec=1000;
 //  if((j=select(fdmax+1,&readfs,0,0,&timeout)) == -1 ) {
+    fprintf(stderr,"about to select\n");
     if((j=select(libline.fdmax+1,&readfs,0,0,NULL)) == -1 ) {//we want to select-sleep as long as possible.
       //any reason to wake up should be a file descriptor in the list. (works for X11 events, dunno about others)
       //on error filedescriptors aren't changed
@@ -198,6 +203,7 @@ int select_on_everything() {
          //we need some way to keep it open on EOF.
           if(libline.fds[i].line_handler) libline.fds[i].line_handler(&libline.fds[i],0);//dunno
           libline.fds[i].fd=-1;//kek
+          continue;
          //return 3;
         }
       }
@@ -220,9 +226,11 @@ int select_on_everything() {
           hack=1;
         }
         *t=0;//we need a way to undo this if the line wasn't eaten.
-        fprintf(stderr,"libidc: line for %d: %s\n",libline.fds[i].fd,line);
+//        fprintf(stderr,"libidc: line for %d: %s\n",libline.fds[i].fd,line);
         if(libline.fds[i].line_handler) {
+          fprintf(stderr,"libidc: about to line_handler for %d\n",libline.fds[i].fd);
           libline.fds[i].line_handler(&libline.fds[i],line);
+          fprintf(stderr,"libidc: back from line_handler for %d\n",libline.fds[i].fd);
           libline.fds[i].bllen-=((t+hack)-libline.fds[i].backlog);
           if(libline.fds[i].bllen <= 0) libline.fds[i].bllen=0;
           else memmove(libline.fds[i].backlog,(t+hack),libline.fds[i].bllen);
@@ -231,9 +239,9 @@ int select_on_everything() {
           // *t='\n';
           //}
         }
-      }
-    }
-  }
+      }//end of looping over each line in backlog
+    }//end of the loop over every select()d fd
+  }//end of infinite loop
   return 0;
 }
 
