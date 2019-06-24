@@ -26,7 +26,7 @@ struct shit {
   void *extra_info;//extra info that I don't care to name atm
 };
 
-struct global {
+struct idc_global {
   int fdmax;
   int shitlen;
   struct shit fds[FD_SETSIZE];

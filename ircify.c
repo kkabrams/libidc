@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include "idc.h"
 
-extern struct global libline;
+extern struct idc_global idc;
 
 int pin[2];
 int pout[2];
@@ -50,9 +50,9 @@ int main(int argc,char *argv[]) {
   argv+=3;
   int i=0;
   for(i=0;i<100;i++) {
-    libline.fds[i].fd=-1;
+    idc.fds[i].fd=-1;
   }
-  libline.shitlen=0;
+  idc.shitlen=0;
   pipe(pin);
   pipe(pout);
   if(!fork()) {
