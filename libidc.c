@@ -181,10 +181,10 @@ int select_on_everything() {
       if(idc.fds[i].fd == -1) continue;//skip -1s
       if(!FD_ISSET(idc.fds[i].fd,&readfs)) continue;//did not find one. hurry back to the for loop
       j--;//we found one. trying to get j==0 so we can get out of here early.
-      //if(idc.fds[i].read_lines_for_us == 0) {
-      //  idc.fds[i].line_handler(&idc.fds[i],0);//the line pointer is null.
-      //  continue;//we don't need to read the line.
-      //}
+      if(idc.fds[i].read_lines_for_us == 0) {
+        idc.fds[i].line_handler(&idc.fds[i],"");//the line pointer is null. which also is EOF? we'll know what it means.
+        continue;//we don't need to read the line.
+      }
       fprintf(stderr,"attempting to read from fd: %d\n",idc.fds[i].fd);
       if((n=read(idc.fds[i].fd,idc.fds[i].buffer,CHUNK)) < 0) {
         snprintf(tmp,sizeof(tmp)-1,"fd %d: read perror:",idc.fds[i].fd);//hopefully this doesn't error and throw off error messages.
