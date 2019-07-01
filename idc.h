@@ -1,3 +1,6 @@
+#ifndef _IDC_H_
+#define _IDC_H_
+
 #include <sys/select.h>
 
 char *read_line_hack(FILE *fp,int len);
@@ -33,3 +36,4 @@ struct idc_global {
 };
 
 int add_fd(int fd,void (*line_handler)(struct shit *,char *));
+#endif
