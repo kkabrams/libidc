@@ -77,11 +77,12 @@ int update_shits() {
 int add_fd(int fd,void (*line_handler)(struct shit *,char *)) {
   int i;
   for(i=0;idc.fds[i].fd != -1 && i <= idc.shitlen;i++);//we're going to use the index of the first -1 or last spot.
-  fprintf(stderr,"adding fd: %d to i: %d\n",fd,i);
+  //fprintf(stderr,"adding fd: %d to i: %d\n",fd,i);
   if(idc.fds[i].fd != -1) {
     fprintf(stderr,"I fucked up somehow.\n");
   }
   idc.fds[i].fd=fd;
+  idc.fds[i].eof=0;
   //idc.fds[i+1].fd=-1;//not always true! we could be inserting to spot 0 while spot 1 is still valid.
   idc.fds[i].backlog=malloc(CHUNK);
   memset(idc.fds[i].backlog,0,CHUNK);
@@ -132,7 +133,8 @@ int select_on_everything() {
 //  FILE *tmpfp;
   fd_set master;
   fd_set readfs;
-//  struct timeval timeout;
+  struct timeval *tout;
+  struct timeval timeout;
 //  int fdmax=0,n,i;
   int n,i,j;
   char tmp[256];
@@ -140,28 +142,34 @@ int select_on_everything() {
   FD_ZERO(&master);
   FD_ZERO(&readfs);
   for(;;) { //at the start of each loop we'll need to recalculate some stuff if there was a change.
-    fprintf(stderr,"in mainloop\n");
+    usleep(10);
+    //fprintf(stderr,"libidc: start of mainloop. if this happens too often something is fucked.\n");
     //if(recalc_shit) { //this is set by anything changing the table of descriptors
-    fprintf(stderr,"building master: ");
+    //fprintf(stderr,"building master: ");
     FD_ZERO(&master);
     at_least_one=0;
+    tout=NULL;//by default we want to wait forever.
     for(i=0;i <= idc.shitlen;i++) {
       if(idc.fds[i].fd != -1) {
         at_least_one++;
-        fprintf(stderr,"fd:%d ",idc.fds[i].fd);
-        FD_SET(idc.fds[i].fd,&master);
+        if(idc.fds[i].eof == 1) {//we have a file we need to monitor for losing its EOF
+          timeout.tv_sec=2; //going to leave these three lines if I change my mind about acting like snow-white
+          timeout.tv_usec=0;
+          tout=&timeout;//we need to monitor this, so timeout of the select sometimes.
+        } else {
+          //fprintf(stderr,"fd:%d ",idc.fds[i].fd);
+          FD_SET(idc.fds[i].fd,&master);
+        }
       }
     }
-    fprintf(stderr,"\n");
+    //fprintf(stderr,"\n");
     if(!at_least_one) return 0;//we have nothing else to possibly do.
     //  recalc_shit=0;
     //}
     readfs=master;
-//  timeout.tv_sec=0; //going to leave these three lines if I change my mind about acting like snow-white
-//  timeout.tv_usec=1000;
 //  if((j=select(fdmax+1,&readfs,0,0,&timeout)) == -1 ) {
-    fprintf(stderr,"about to select\n");
-    if((j=select(idc.fdmax+1,&readfs,0,0,NULL)) == -1 ) {//we want to select-sleep as long as possible.
+    //fprintf(stderr,"about to select\n");
+    if((j=select(idc.fdmax+1,&readfs,0,0,tout)) == -1 ) {//we want to select-sleep as long as possible.
       //any reason to wake up should be a file descriptor in the list. (works for X11 events, dunno about others)
       //on error filedescriptors aren't changed
       //the value of timeout is undefined
@@ -182,30 +190,28 @@ int select_on_everything() {
       if(!FD_ISSET(idc.fds[i].fd,&readfs)) continue;//did not find one. hurry back to the for loop
       j--;//we found one. trying to get j==0 so we can get out of here early.
       if(idc.fds[i].read_lines_for_us == 0) {
-        idc.fds[i].line_handler(&idc.fds[i],"");//the line pointer is null. which also is EOF? we'll know what it means.
+        idc.fds[i].line_handler(&idc.fds[i],"");
         continue;//we don't need to read the line.
       }
-      fprintf(stderr,"attempting to read from fd: %d\n",idc.fds[i].fd);
+      fprintf(stderr,"attempting to read from fd: %d eofstat: %d\n",idc.fds[i].fd,idc.fds[i].eof);
       if((n=read(idc.fds[i].fd,idc.fds[i].buffer,CHUNK)) < 0) {
         snprintf(tmp,sizeof(tmp)-1,"fd %d: read perror:",idc.fds[i].fd);//hopefully this doesn't error and throw off error messages.
         perror(tmp);
         return 2;
       }
-      fprintf(stderr,"read %d bytes from fd: %d\n",n,idc.fds[i].fd);
+      //fprintf(stderr,"read %d bytes from fd: %d\n",n,idc.fds[i].fd);
       if(n == 0) {
         fprintf(stderr,"reached EOF on fd: %d\n",idc.fds[i].fd);
         if(idc.fds[i].keep_open) {
-          //tmpfp=fdopen(idc.fds[i].fd,"r");
-          //lseek(idc.fds[i].fd,SEEK_SET,0);
-          //clearerr(tmpfp);
-          //fuck if I know...
+          idc.fds[i].eof=1;//this flag is only used if we want to wait for eof to go away.
+          continue;
         } else {
-         //we need some way to keep it open on EOF.
           if(idc.fds[i].line_handler) idc.fds[i].line_handler(&idc.fds[i],0);//dunno
           idc.fds[i].fd=-1;//kek
           continue;
-         //return 3;
         }
+      } else {
+        idc.fds[i].eof=0;
       }
       if(idc.fds[i].bllen+n > idc.fds[i].blsize) {//this is probably off...
         t=malloc(idc.fds[i].blsize+n);
@@ -228,9 +234,9 @@ int select_on_everything() {
         *t=0;//we need a way to undo this if the line wasn't eaten.
 //        fprintf(stderr,"libidc: line for %d: %s\n",idc.fds[i].fd,line);
         if(idc.fds[i].line_handler) {
-          fprintf(stderr,"libidc: about to line_handler for %d\n",idc.fds[i].fd);
+          //fprintf(stderr,"libidc: about to line_handler for %d\n",idc.fds[i].fd);
           idc.fds[i].line_handler(&idc.fds[i],line);
-          fprintf(stderr,"libidc: back from line_handler for %d\n",idc.fds[i].fd);
+          //fprintf(stderr,"libidc: back from line_handler for %d\n",idc.fds[i].fd);
           idc.fds[i].bllen-=((t+hack)-idc.fds[i].backlog);
           if(idc.fds[i].bllen <= 0) idc.fds[i].bllen=0;
           else memmove(idc.fds[i].backlog,(t+hack),idc.fds[i].bllen);
