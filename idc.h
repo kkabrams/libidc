@@ -21,6 +21,7 @@ struct shit {
 
   char read_lines_for_us;
   char keep_open;
+  char eof;
   //other stuffs?
 //  union {
   void (*line_handler)(struct shit *me,char *line);//function pointer to the handler. ???
