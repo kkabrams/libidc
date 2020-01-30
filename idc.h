@@ -1,6 +1,7 @@
 #ifndef _IDC_H_
 #define _IDC_H_
 
+#include <stdio.h>
 #include <sys/select.h>
 
 char *read_line_hack(FILE *fp,int len);
