@@ -130,8 +130,10 @@ char *memstr(char *s,char *find,size_t l) {
 int select_on_everything() {
   int hack;
   int at_least_one;
+  int eofcount;
 //  FILE *tmpfp;
   fd_set master;
+  fd_set eofset;
   fd_set readfs;
   struct timeval *tout;
   struct timeval timeout;
@@ -146,16 +148,20 @@ int select_on_everything() {
     //fprintf(stderr,"libidc: start of mainloop. if this happens too often something is fucked.\n");
     //if(recalc_shit) { //this is set by anything changing the table of descriptors
     //fprintf(stderr,"building master: ");
+    FD_ZERO(&eofset);
     FD_ZERO(&master);
     at_least_one=0;
+    eofcount=0;
     tout=NULL;//by default we want to wait forever.
     for(i=0;i <= idc.shitlen;i++) {
       if(idc.fds[i].fd != -1) {
         at_least_one++;
         if(idc.fds[i].eof == 1) {//we have a file we need to monitor for losing its EOF
-          timeout.tv_sec=2; //going to leave these three lines if I change my mind about acting like snow-white
+          timeout.tv_sec=2;
           timeout.tv_usec=0;
           tout=&timeout;//we need to monitor this, so timeout of the select sometimes.
+          FD_SET(idc.fds[i].fd,&eofset);
+          eofcount++;
         } else {
           //fprintf(stderr,"fd:%d ",idc.fds[i].fd);
           FD_SET(idc.fds[i].fd,&master);
@@ -184,11 +190,15 @@ int select_on_everything() {
     }
     fprintf(stderr,"after select(). ret: %d\n",j);
 //  for(i=0;fds[i] != -1;i++) if(extra_handler) extra_handler(fds[i]);
-    if(j == 0) continue;//don't bother to loop over them.
-    for(i=0;i < idc.shitlen && j>0;i++) {
+    if(j == 0) {//we MIGHT have some EOFs that need to be tried...
+      if(eofcount == 0) {//if eofcount is zero we don't need to keep going
+        continue;//don't bother to loop over them.
+      }
+    }
+    for(i=0;i < idc.shitlen;i++) {
       if(idc.fds[i].fd == -1) continue;//skip -1s
-      if(!FD_ISSET(idc.fds[i].fd,&readfs)) continue;//did not find one. hurry back to the for loop
-      j--;//we found one. trying to get j==0 so we can get out of here early.
+      if(!FD_ISSET(idc.fds[i].fd,&readfs) && !FD_ISSET(idc.fds[i].fd,&eofset)) continue;//did not find one. hurry back to the for loop
+      //j--;//we found one. trying to get j==0 so we can get out of here early.
       if(idc.fds[i].read_lines_for_us == 0) {
         idc.fds[i].line_handler(&idc.fds[i],"");
         continue;//we don't need to read the line.
