@@ -254,6 +254,10 @@ int select_on_everything() {
           // if(hack == 2) {*t='\r'; t++;}
           // *t='\n';
           //}
+	  if(idc.fds[i].read_lines_for_us == 0) { //this /could/ be changed by a line handler setting this flag
+            //we need to bail out of the loop that is getting lines from the buffer
+	    break;
+	  }
         }
       }//end of looping over each line in backlog
     }//end of the loop over every select()d fd
