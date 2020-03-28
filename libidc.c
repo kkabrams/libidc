@@ -188,7 +188,7 @@ int select_on_everything() {
       else perror("wtf? select");
       //continue;
     }
-    fprintf(stderr,"after select(). ret: %d\n",j);
+    //fprintf(stderr,"after select(). ret: %d\n",j);
 //  for(i=0;fds[i] != -1;i++) if(extra_handler) extra_handler(fds[i]);
     if(j == 0) {//we MIGHT have some EOFs that need to be tried...
       if(eofcount == 0) {//if eofcount is zero we don't need to keep going
@@ -203,7 +203,7 @@ int select_on_everything() {
         idc.fds[i].line_handler(&idc.fds[i],"");
         continue;//we don't need to read the line.
       }
-      fprintf(stderr,"attempting to read from fd: %d eofstat: %d\n",idc.fds[i].fd,idc.fds[i].eof);
+      //fprintf(stderr,"attempting to read from fd: %d eofstat: %d\n",idc.fds[i].fd,idc.fds[i].eof);
       if((n=read(idc.fds[i].fd,idc.fds[i].buffer,CHUNK)) < 0) {
         snprintf(tmp,sizeof(tmp)-1,"fd %d: read perror:",idc.fds[i].fd);//hopefully this doesn't error and throw off error messages.
         perror(tmp);
@@ -211,7 +211,7 @@ int select_on_everything() {
       }
       //fprintf(stderr,"read %d bytes from fd: %d\n",n,idc.fds[i].fd);
       if(n == 0) {
-        fprintf(stderr,"reached EOF on fd: %d\n",idc.fds[i].fd);
+        //fprintf(stderr,"reached EOF on fd: %d\n",idc.fds[i].fd);
         if(idc.fds[i].keep_open) {
           idc.fds[i].eof=1;//this flag is only used if we want to wait for eof to go away.
           continue;
