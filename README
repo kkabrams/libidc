@@ -1,1 +1,18 @@
-libirc.c
+idc
+
+input
+dispatched
+callbacks
+
+this is still in a very rough shape.
+
+requires manually putting:
+
+  extern struct idc_global idc;
+
+and then putting some initialization for an array like:
+
+  for(i=0;i<100;i++) {
+    idc.fds[i].fd=-1;
+  }
+  idc.shitlen=0;
